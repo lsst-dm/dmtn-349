@@ -289,3 +289,11 @@ You can use a coding agent to add the tests.
 ```{bibliography}
   :style: lsst_aa
 ```
+
+## Appendix: Initial Port Design Spec
+
+This is the initial design spec for the overall shape of the port from C as developed iteratively with the Superpowers plugin brainstorming mode on 2026-04-20 with input from David Berry and Jim Bosch.
+Some things have changed
+
+```{include} 2026-04-20-rust-port-design.md
+```
