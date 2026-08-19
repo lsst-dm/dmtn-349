@@ -235,6 +235,49 @@ For FY26 SLAC are absorbing the cost of the API keys as part of the research exp
 This time we decided to start by planning what we thought the port should look like in terms of memory management and mutability and how traits should relate to C objects.
 As was done previously the wcsLib, ERFA, and PAL source code were copied unchanged with Rust shims on top.
 
+### Lessons Learned
+
+For the AST port adding more simplification fixtures led to a critical discovery that the `CmpMap` flattening in Rust was using a different (but mathematically equivalent) algorithm to the C code -- transforms were working fine before and after simplification but the mappings had a different shape when serialized.
+Fixing that took a while to recover with many commits porting C algorithms.
+
+## Recommendations
+
+```{figure} starlink-port-interleave.svg
+
+A timeline for the work described in this document as of mid August 2026.
+You can see how the prototype triggered work in the C library to update the build system and add test coverage and that later work on the port resulted in separate work on the C library (bug fixes and additional test fixtures).
+The spike in the AST commit history in May is adding many more simplification example test fixtures.
+```
+
+The key takeaway from this work is that your language port is only as good as the test coverage of your original code.
+The coding agent will try to take the easiest path to generating the code from your prompt.
+You can ask it to be faithful to the source language but you can't be sure it is really going to do that unless there are tests that demonstrate exactly what you need.
+For AST this is made more explicit by the addition of hundreds of test fixtures involving serialized FrameSets and Mappings as both native AST serializations and FITS headers.
+Adding test coverage to the source library before you start the port, especially for edge cases, pays dividends many times over once you start on the port.
+You can use a coding agent to add the tests.
+
+* Always write a plan first and refer to that plan in your `CLAUDE.md` or equivalent so that the plan is checked against implementation.
+  Allow the plan to be updated based on lessons learned.
+* Keep a running ledger of open work so that you do not continually have to scan the C and Rust source to check what has been ported.
+  * You will want to port every test so for auditing purposes annotate in your new tests where the test came from originally.
+  * Consider having a TODO list of every test that you can then mark off as the port progresses.
+* Correctness and completeness are more important for a port than performance.
+  Do not start optimizing until you are passing every test.
+  Even if you have code coverage for the small area you are optimizing you make it harder later on to reason about whether the Rust version truly matches the C approach and some times the optimization can shift logic around that confuses a later code addition that relied on the earlier form.
+* Ensure that your coding standards can not be bypassed.
+  Use `pre-commit` / `prek` hooks to capture all code linting such as `ruff` and `numpydoc` in Python and `clippy` in Rust.
+  Every gate you can apply to commits forces the agent to follow your guidelines in a far more robust way than making a note in the `CLAUDE.md` file ever would.
+  In Python use as many `ruff check` options as you can.
+* Some coding practices do have to be included in the `CLAUDE.md` file but remember that this is guidance and not treated as a hard rule --- the prompt and history will all be processed along with the `CLAUDE.md`.
+  Negative directives are weaker than positive directives.
+  For Python, agents have a tendency to prefer to add imports locally rather than at the top of the file so consider adding an instruction to always put imports at the top unless there is an import cycle.
+* For the AST port it was critical to strongly declare that the C algorithms were the source of truth and were to always be used as is and to only use heuristics in the Rust if the same heuristic was present in the C.
+  The C library is the "oracle" and you have to insist that whenever there is a difficulty in getting a Rust test to pass that the oracle be checked and instrumented.
+* In some cases there will be bugs in your original library and these will be noticed by the coding agent.
+  Sometimes the agent will not tell you about them (such as triggering a SEGV in an oracle investigation) so you have to ask.
+  Sometimes the agent will realize there is a bug in the original but code that bug into the port.
+  I eventually added a standard instruction noting that bugs are possible in the original and should be recorded in a separate document.
+
 [^astshim]: <https://github.com/lsst/astshim>
 [^rubinoxide]: <https://github.com/lsst/rubinoxide>
 [^jniast]: The JNIAST package in 2002 October included the lines "This package is a temporary measure; in due course it will be superseded by the pure java WCS package.  WCS is being actively worked on now (mid 2002), but the timescale for completion is uncertain."
