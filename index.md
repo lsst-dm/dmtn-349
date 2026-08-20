@@ -411,6 +411,13 @@ At Rubin the observatory software team are experimenting with using agents to co
 The LSST Science Pipelines have 150,000 lines of C++ code and it is now clear that converting that to Rust is a plausible enterprise if we wish to do so.
 Most of those libraries are significantly less complex than the AST library.
 
+## Acknowledgments
+
+I thank David Berry and Jim Bosch for their feedback on the initial design spec and for answering numerous questions.
+In particular David also was tasked with reviewing some of the giant AST pull requests.
+I also thank Michael Shehadeh from SLAC IT for his help with te Claude configuration and API key at SLAC.
+The project would not been possible without the generous allocations of tokens from SLAC IT.
+
 ## References
 
 ```{bibliography}
