@@ -270,6 +270,10 @@ Somewhat embarrassingly this second port made a similar mistake regarding simpli
 In late May I went back to the AST library and decided to methodically generate hundreds of `CmpMap`s in order to maximize code coverage and provide a true reference corpus of the simplification logic.
 This immediately led to vast numbers of failures on the Rust side including a critical discovery that the `CmpMap` flattening in Rust was using a different (but mathematically equivalent) algorithm to the C code -- transforms were working fine before and after simplification but the mappings had a different shape when serialized.
 Fixing that took a while to recover with many commits porting C algorithms and reorganizing all the related `MapMerge` logic into each mapping where it should have always resided.
+Even by late August with 400 test fixtures passing it was discovered that some parts of the simplification chain were in the wrong place and other places were missing with workarounds.
+This was discovered with a full audit comparing the C and Rust side.
+It was even discovered that some bespoke logic had been included in the serialization layer to allow a test to pass even though the simplification logic was not fully accurate.
+Given that the transform logic was working correctly and the serialization output was incorrect in an edge case, we still needed to match the C logic to give us confidence we had not missed something critical.
 
 Because there was no internal tracking of port status in any committed document there were some cases where some classes were added (such as the regions) but only implemented a subset of the internal C logic.
 Since nothing was tracking the missing logic there were cases in other parts of the code that worked around the absence rather than understanding that the real fix was to fix it properly.
@@ -376,6 +380,11 @@ You can use a coding agent to add the tests.
 * Correctness and completeness are more important for a port than performance.
   Do not start optimizing until you are passing every test.
   Even if you have code coverage for the small area you are optimizing you make it harder later on to reason about whether the Rust version truly matches the C approach and sometimes the optimization can shift logic around that confuses a later code addition that relied on the earlier form.
+* You do not want to end up with a line for line port of the source library to the new language.
+  You want to ensure that the algorithms are ported (with annotations) whilst making use of new language features.
+  For example, for the Rust port we used the standard `Option` and `Result` approach to status handling rather than inherited integer status.
+  The AST library is particularly well-suited to a bit since the original authors were very careful to explain all their decisions as detailed comments and to carefully separate each chunk of logic.
+  This allowed the Rust port to easily pont at distinct blocks of code in the original.
 * Ensure that your coding standards cannot be bypassed.
   Use `pre-commit` / `prek` hooks to capture all code linting such as `ruff` and `numpydoc` in Python and `clippy` in Rust.
   Every gate you can apply to commits forces the agent to follow your guidelines in a far more robust way than making a note in the `CLAUDE.md` file ever would.
@@ -389,6 +398,18 @@ You can use a coding agent to add the tests.
   Sometimes the agent will not tell you about them (such as triggering a SEGV in an oracle investigation) so you have to ask.
   Sometimes the agent will realize there is a bug in the original but code that bug into the port.
   I eventually added a standard instruction noting that bugs are possible in the original and should be recorded in a separate document.
+* Some times the agent will flail around trying to work out what is going wrong.
+  Remember that you have an oracle.
+  Suggest to the agent that it instruments the original library so it can trace exactly what code is involved for a passing test.
+  This helped many times in the port of the AST library for mapping simplification verification and for performance validation such as ensuring the same number of trigonometric calls occur in both the original and the port.
+  * If the target language has native tracing/debugging/logging facilities embed those features into the port as you go.
+    If you do not do this you will notice that the agent is continually adding and removing debugging instrumentation.
+    Even better if you can add similar facilities to the original library to allow direct comparison.
+    Agents can work much faster if they can turn on trace logic on both sides and immediately see the shape of the difference in logic without having to cycle through phases of code churn each step of the way.
+
+When porting from one language to another you have to decide whether "byte exact" is important or if you are targeting test completeness.
+The former is much harder than the latter but is required if this is a mission critical core library.
+Once you are byte exact, you are then able to focus on performance optimizations.
 
 [^astshim]: <https://github.com/lsst/astshim>
 [^rubinoxide]: <https://github.com/lsst/rubinoxide>
