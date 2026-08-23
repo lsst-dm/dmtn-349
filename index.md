@@ -146,6 +146,14 @@ The gap indicates time not working on the port.
 
 ### Lessons Learned
 
+```{figure} simplify-passes.svg
+
+An example of how the AST simplify logic can work with multiple passes converting 8 mappings to 3.
+Note how it linearizes the mapping chain and then starts walking through from first to last.
+Every reduction in mapping count leads to more transform performance.
+The simplification engine is one of the places with the most complex logic and the easiest to misunderstand and implement simpler algorithms if the test fixtures are not driving completeness.
+```
+
 In about 10 days the port implemented about 15% of the C library's logic, dominated by code for reading a Rubin FITS header and transforming the resultant `FrameSet` from pixel coordinates to sky coordinates and vice versa.
 Writing of FITS headers was not implemented but native plain text serialization was added for the supported subset of mappings.
 
