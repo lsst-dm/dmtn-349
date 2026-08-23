@@ -282,6 +282,10 @@ Even by late August with 400 test fixtures passing it was discovered that some p
 This was discovered with a full audit comparing the C and Rust side.
 It was even discovered that some bespoke logic had been included in the serialization layer to allow a test to pass even though the simplification logic was not fully accurate.
 Given that the transform logic was working correctly and the serialization output was incorrect in an edge case, we still needed to match the C logic to give us confidence we had not missed something critical.
+Even worse, whilst trying to recover from the earlier mistakes and instrumenting the entire simplification engine we realized that very early on the port had written a `simplified()` API that corresponded to the internal vtable implementation but which incorrectly included some `map_merge` logic when it should not and crucially was called in much of the code instead of the public `simplify()` method.
+This was the root cause of the simplification discrepancies since only `simplify()` stamped the `IsSimple` flag and calling the internal method bypassed that flag and led to premature simplifications or redone simplifications.
+Furthermore, having some logic in `simplified()` instead of `map_merge` meant that the `CmpMap` simplification could not be reproduced.
+Recovering this dominated the late August work.
 
 Because there was no internal tracking of port status in any committed document there were some cases where some classes were added (such as the regions) but only implemented a subset of the internal C logic.
 Since nothing was tracking the missing logic there were cases in other parts of the code that worked around the absence rather than understanding that the real fix was to fix it properly.
