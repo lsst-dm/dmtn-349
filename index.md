@@ -170,9 +170,9 @@ One ongoing lesson from this work is that agents will cut corners to solve the i
 
 When this work started it was an open-ended port where guidance was given to the agent interactively but there was only the one guiding principle of porting everything.
 One decision I made early on was to record porting decisions in a single place (`PORT.md`), eventually having it be updated every time a decision was made or some problem was hit.
-This provided a valuable historical record but no thought was given as to how it affected the agent's context -- the file was being scanned with every prompt and eventually that content dominated everything (this was before contexts in the millions were supported).
+This provided a valuable historical record but no thought was given as to how it affected the agent's context -- the file was being scanned by the agent at every step since it was required to keep it up to date and eventually that content dominated the context and token usage (this was before contexts in the millions were supported).
 In retrospect it would have been better to have this document be used as an active record of the current state of the port rather than it continuing to grow as new information becomes available.
-Having that file include the active to do list for the port plus any decisions made in the port and any mistakes made that should not be repeated, would have given a more bounded document that could iteratively improve the quality of the port.
+Having that file instead only include the active to do list for the port plus any decisions made in the port and any mistakes made that should not be repeated, would have given a more bounded document that could iteratively improve the quality of the port without overflowing the agent's context.
 
 There were a number of interesting problems encountered during the work:
 
@@ -204,11 +204,19 @@ In addition to these issues there were some more serious examples of the agent f
 There were also inefficiencies:
 
 1. When parsing a SIP FITS header, the code was creating a serialized native text form of the polynomial definition and handing it to `PolyMap` to be parsed rather than just using the direct `PolyMap` constructor.
-2. I wondered about performance issues too early in the process and driving the agent to make something faster led to it putting optimizations in the wrong places which then led to downstream confusion that built on those mistakes.
+2. As mappings were added I was interested in knowing how the Rust compared to C with transfor performance.
+   This was too early in the process and driving the agent to make something faster led to it putting performance optimizations in the wrong places which then led to downstream confusion that built on those mistakes.
 
 The fundamental learning from the prototype work was that test coverage of the C library is critical, as is the use of the oracle to provide immediate feedback to compare with the new code when there is a disagreement.
 At the time test coverage in AST was mainly handled through Fortran testing with no formal coverage reporting.
 This then provided the focus for the next phase.
+
+```{note}
+Key insights:
+
+1. Test coverage of the oracle library is critical.
+2. The oracle as source-of-truth always wins and should be consulted throughout the port.
+```
 
 ## Tests Are Important
 
@@ -395,8 +403,8 @@ You can use a coding agent to add the tests.
 * You do not want to end up with a line for line port of the source library to the new language.
   You want to ensure that the algorithms are ported (with annotations) whilst making use of new language features.
   For example, for the Rust port we used the standard `Option` and `Result` approach to status handling rather than inherited integer status.
-  The AST library is particularly well-suited to a bit since the original authors were very careful to explain all their decisions as detailed comments and to carefully separate each chunk of logic.
-  This allowed the Rust port to easily pont at distinct blocks of code in the original.
+  The AST library is particularly well-suited to porting since the original authors were very careful to explain all their decisions as detailed comments and to carefully separate each chunk of logic (there are more comment lines than code lines).
+  This allowed the Rust port to easily point at distinct blocks of code in the original.
 * Ensure that your coding standards cannot be bypassed.
   Use `pre-commit` / `prek` hooks to capture all code linting such as `ruff` and `numpydoc` in Python and `clippy` in Rust.
   Every gate you can apply to commits forces the agent to follow your guidelines in a far more robust way than making a note in the `CLAUDE.md` file ever would.
@@ -414,10 +422,10 @@ You can use a coding agent to add the tests.
   Remember that you have an oracle.
   Suggest to the agent that it instruments the original library so it can trace exactly what code is involved for a passing test.
   This helped many times in the port of the AST library for mapping simplification verification and for performance validation such as ensuring the same number of trigonometric calls occur in both the original and the port.
-  * If the target language has native tracing/debugging/logging facilities embed those features into the port as you go.
-    If you do not do this you will notice that the agent is continually adding and removing debugging instrumentation.
-    Even better if you can add similar facilities to the original library to allow direct comparison.
-    Agents can work much faster if they can turn on trace logic on both sides and immediately see the shape of the difference in logic without having to cycle through phases of code churn each step of the way.
+* If the target language has native tracing/debugging/logging facilities embed those features into the port as you go.
+  If you do not do this you will notice that the agent is continually adding and removing debugging instrumentation.
+  Even better if you can add similar facilities to the original library to allow direct comparison.
+  Agents can work much faster if they can turn on trace logic on both sides and immediately see the shape of the difference without having to cycle through phases of code churn each step of the way.
 
 When porting from one language to another you have to decide whether "byte exact" is important or if you are targeting test completeness.
 The former is much harder than the latter but is required if this is a mission critical core library.
@@ -432,7 +440,7 @@ Once you are byte exact, you are then able to focus on performance optimizations
 ## Conclusions
 
 At the time of writing it is clear that a Large Language Model coding agent such as Claude Opus/Fable or ChatGPT 5.6 Sol, is fully capable of porting large libraries to different languages so long as the original library is well tested.
-The test suite, planning, and a reference oracle mitigate many of the problems faced with using LLMs to write large amounts of new code that has no such boundary conditions.
+The test suite, planning, and a reference oracle mitigate many of the problems encountered when using LLMs to write large amounts of new code that has no such boundary conditions.
 At Rubin the observatory software team is experimenting with using agents to convert LabVIEW to Rust.
 The LSST Science Pipelines have 150,000 lines of C++ code in libraries and it is now clear that converting that to Rust is a plausible enterprise if we wish to do so.
 Most of those pipelines libraries are significantly less complex than the AST library.
