@@ -1,8 +1,8 @@
-# Experimenting with Porting a Large C Library to Rust using Coding Agents
+# Experimenting with Porting a Large C Library to Rust Using Coding Agents
 
 ```{abstract}
 With the rapid rise in abilities of Large Language Model Coding Agents such as Codex and Claude Code over the course of 2026, it became apparent that some software tasks which had seemed impossible to implement were now possible to contemplate.
-In this document I will discuss one such task involving the conversion of 475,000 lines of a C library that has been in development for 30 years to Rust.
+In this document I will discuss one such task involving the conversion of approximately 475,000 lines of a C library that has been in development for 30 years to Rust.
 The motivation for choosing Rust is the much stronger memory management model and additional type safety inherent in the language, coupled with the more modern tooling infrastructure available and the potential to support technologies such as WebAssembly.
 
 The main outcome from this work is that your success in porting any code to a different language using agents depends entirely on the test coverage of your original source code.
@@ -10,7 +10,7 @@ The main outcome from this work is that your success in porting any code to a di
 
 ## Introduction
 
-In February 2026 I was modernizing the Python bindings of the Starlink AST library {cite:p}`2016A&C....15...33B` to make it usable as the WCS backend for our file format and data modeling rewrite of the LSST Science Pipeline images {cite:p}`DMTN-339`.
+In February 2026 I was modernizing the Python bindings of the Starlink AST library {cite:p}`2016A&C....15...33B` to make it usable as the WCS backend for our file format and data modeling rewrite of the LSST Science Pipelines images {cite:p}`DMTN-339`.
 This was needed since there had been a new release of the C library that included critical functionality and we needed those changes [on PyPI](https://pypi.org/project/starlink-pyast/).
 For historical reasons (the Python wrapping work started in 2011) the Python interface was written using native C Python APIs and had to support Python 2.6 and 3.x.
 I decided to try using the newly-released OpenAI Codex with GPT-5.3 and I was impressed by its ability to quickly analyze the code, remove the Python 2 legacy interfaces and modernize the C API calls for Python 3.11 and newer.
@@ -41,15 +41,15 @@ C++ was not used given the immaturity of the C++ infrastructure and standardizat
 AST objects also support reference counting and lifetime tracking.
 Additionally, to improve performance when rapidly creating and freeing many objects, an entire memory allocation layer was added.
 
-The core of the C library (not including tests) consists of nearly 475,000 lines.
+The core of the C library (not including tests or vendored code) consists of nearly 475,000 lines.
 This is a substantial library to port to any language.
-There are three vendored C libraries handling the spherical geometry and time transformations: wcsLib {cite:p}`2011ascl.soft08003C`, ERFA (the BSD-licensed version of SOFA), and PAL {cite:p}`2013ASPC..475..307J`.
+There are three vendored C libraries handling the spherical geometry and time transformations: WCSLIB {cite:p}`2011ascl.soft08003C`, ERFA (the BSD-licensed version of SOFA), and PAL {cite:p}`2013ASPC..475..307J`.
 For this work we decided to retain those vendored libraries (around 65k lines of C) in the Rust port, with the eventual plan to port the subset needed for AST to Rust when we were convinced that the port was stable and accurate.
 
 ```{figure} starlink-ast-loc.svg
 
 How the Starlink C AST library has evolved over the last 30 years.
-This graph shows the lines of C code (comments plus code, including tests) as a function of time and includes the main library and associated test code.
+This graph shows the lines of C code (comments plus code, including tests and vendored code) as a function of time and includes the main library and associated test code.
 It does not include the Fortran test code.
 The Git repository started in 1998 after 100,000 lines of code had already been written.
 Gaps in the timeline note where at least 3 months had elapsed between commits.
@@ -59,7 +59,7 @@ Gaps in the timeline note where at least 3 months had elapsed between commits.
 
 In the early 2000s the Starlink Project was instructed to switch away from using C and Fortran with a bespoke message bus (ADAM) and instead switch to the more modern technologies of Java and SOAP {cite:p}`2003ASPC..295..445B`.
 As part of that work it was realized that the AST library was a core foundation of the Starlink software ecosystem.
-They started work on such a port in early 2002 but by October 2002 they had already decided that as an interim measure there should be a JNI wrapper around the existing AST C library.[^jniast]
+They started work on such a port in early 2002 but by 2002 October they had already decided that as an interim measure there should be a JNI wrapper around the existing AST C library.[^jniast]
 This has many disadvantages in that it requires a different binary per supported architecture but it did unblock the use of WCS in tools such as SPLAT {cite:p}`2014A&C.....7..108S`, SoG (Son of GAIA), and Treeview.[^treeview]
 By the time of the 2003 ADASS {cite:p}`2004ASPC..314..412B` there was no mention of a native Java port, solely JNI, and the project had been abandoned.
 
@@ -70,7 +70,7 @@ There was also some concern that the legacy FITS header support would be particu
 ## AST Usage in the LSST Science Pipelines
 
 There were two aspects to integrating the AST library into the LSST Science Pipelines {cite:p}`PSTN-019`.
-Firstly a C++ wrapper was written[^astshim] to provide an interface more similar to existing C++ semantics used in the pipelines code.
+First a C++ wrapper was written[^astshim] to provide an interface more similar to existing C++ semantics used in the pipelines code.
 This included the addition of more controlled object lifetimes and standardized property accessors.
 
 The second aspect was to wrap the AST internals in a more specialist `SkyWcs` C++ class such that a pipelines user would never know how the WCS transforms were implemented unless they were explicitly manipulating the mappings.
@@ -97,7 +97,7 @@ These reasons were enough to suggest that we should try to port the AST library,
 
 In order to investigate the feasibility of a port I decided the easiest thing to do was to try it and see what would happen.
 My previous experience of using coding agents was for small fixes and code cleanups as described in the introduction.
-Late in the afternoon of 2026-03-03 I decided to try the newly-released OpenAI Codex application (model 5.3) to start working on the port.
+Late in the afternoon of 2026-03-03 I decided to try the OpenAI Codex application (model GPT-5.3) to start working on the port.
 I was using a $20/month Team account for this work.
 At the time I did not know enough to make sure there was an `AGENTS.md` file to refer to repository policies and was not aware that much can be gained by explicitly planning more up front.
 
@@ -109,7 +109,7 @@ My first prompt was:
 > Please read that file and come up with an initial plan for the port.
 > Append to TODO.md as needed to remember decisions.
 
-and my associated support file was:
+and my associated `TODO.md` support file was:
 
 > The aim of this work is to convert the Starlink AST C library (in the ast directory) into a rust library in the starlink-astrs directory.
 >
@@ -133,9 +133,9 @@ The coding agent was able to build the C library and write exploratory code agai
 
 Work resumed towards the end of March and whilst initial progress was good, adding another 10,000 lines in a day, work then became much more difficult.
 As the porting evolved I decided to focus on a core functionality of being able to read a Rubin-style FITS header with SIP distortions and run the transform chain for that end-to-end.
-I had it write benchmarking tooling to compare performance of the polynomial distortions between C and Rust with different numbers of inputs to compare the performance of small numbers of points (C is relatively slow with those) versus large numbers of points (C uses extensive up front set-up that is optimized for large numbers of points).
+I had it write benchmarking tooling to compare performance of the polynomial distortions between C and Rust with different numbers of inputs to compare the performance of small numbers of points (C is relatively slow with those) versus large numbers of points (C uses extensive up-front setup that is optimized for large numbers of points).
 
-Towards the end of March there was a significant drop off in code generation as the agent tied itself in knots trying to work on simplification logic and this resulted in a decision to step back from the port and re-assess (once I had run out of tokens in two days).
+Towards the end of March there was a significant drop off in code generation as the agent tied itself in knots trying to work on simplification logic and this resulted in a decision to step back from the port and re-assess (I had run out of tokens in two days).
 It also turned out that March 2026 was special in that OpenAI had allocated significantly more tokens to users of the new Codex app than they would subsequently allow towards the end of April, leading to a false sense of abundance that would turn out to be short-lived.
 
 ```{figure} starlink-astrs-proto-loc.svg
@@ -151,7 +151,7 @@ The gap indicates time not working on the port.
 An example of how the AST simplify logic can work with multiple passes converting 8 mappings to 3.
 Note how it linearizes the mapping chain and then starts walking through from first to last.
 Every reduction in mapping count leads to more transform performance.
-The simplification engine is one of the places with the most complex logic and the easiest to misunderstand and implement simpler algorithms if the test fixtures are not driving completeness.
+The simplification engine is one of the places with the most complex logic and also is the easiest to misunderstand and end up implementing simpler algorithms if the test fixtures are not driving completeness.
 ```
 
 In about 10 days the port implemented about 15% of the C library's logic, dominated by code for reading a Rubin FITS header and transforming the resultant `FrameSet` from pixel coordinates to sky coordinates and vice versa.
@@ -176,10 +176,10 @@ Having that file instead only include the active to do list for the port plus an
 
 There were a number of interesting problems encountered during the work:
 
-1. When looking at a dual-sideband FITS header the Rust was not calculating the correct spectral values and tried multiple times to work out why there were differences, including optimizations involving irrelevant FITS header cards.
+1. When looking at a dual-sideband FITS header the agent was not calculating the correct spectral values and tried multiple times to work out why there were differences, including optimizations involving irrelevant FITS header cards.
    Once the error was below 300 Hz it couldn't make any improvement and was at risk of saying that was close enough.
    It turned out that the real problem was that there was a missing timescale conversion from UTC to TDB earlier in the chain.
-2. One of the key aspects of AST is its ability to simplify complex `FrameSets` into simpler forms by noting cases where two adjacent mappings can be combined (such as a forward mapping and an inverse mapping canceling out, or a `ZoomMap` and a `MatrixMap` being combined into a single `MatrixMap`).
+2. One of the key aspects of AST is its ability to simplify complex `FrameSet`s into simpler forms by noting cases where two adjacent mappings can be combined (such as a forward mapping and an inverse mapping canceling out, or a `ZoomMap` and a `MatrixMap` being combined into a single `MatrixMap`).
    This is critical for performance since it minimizes the number of transforms to be calculated.
    When I asked Codex to add simplification I failed to notice that, even though it mentioned in the porting document that the C library has simplification logic per mapping, it was putting special-cased simplification logic in a single file.
    The only clue was firstly that it was having a harder and harder time matching the simplification logic from the C as it stacked more and more variations in one place, but also that the `cmp_map.rs` file was becoming significantly larger than the C original.
@@ -197,14 +197,15 @@ In addition to these issues there were some more serious examples of the agent f
 3. At one point some test fixtures that were meant to be generated by the oracle were in fact generated by the Rust -- a guarantee that the test would pass.
 4. On another occasion the Rust code started to special case different combinations of spatial and spectral FITS headers since it did not understand that in most cases parsing the spatial WCS is distinct from parsing the spectral WCS.
    It also created an entirely new class, `TanSkyMap`, specifically to handle one specialist FITS header.
-5. The `degen1.ast` example `FrameSet` is one of the trickiest to handle since it has a degenerate WCS with mismatched pixel axes, the Rust test code was failing to generate a simplified form that matched the C and so it had a special clause in the code specifically for this `FrameSet` to reorganize it in the required form.
+5. The `degen1.ast` example `FrameSet` is one of the trickiest to handle since it has a degenerate WCS with mismatched pixel axes.
+   The Rust test code was failing to generate a simplified form that matched the C and so it had a special clause in the code specifically for this `FrameSet` to reorganize it into the required form.
    The workaround was explicitly turned off when reading similar example files that would be broken by the rewrite.
-6. Special-cased handling was also included for some form of CAR headers.
+6. Special-cased handling was also included for some forms of CAR headers.
 
 There were also inefficiencies:
 
 1. When parsing a SIP FITS header, the code was creating a serialized native text form of the polynomial definition and handing it to `PolyMap` to be parsed rather than just using the direct `PolyMap` constructor.
-2. As mappings were added I was interested in knowing how the Rust compared to C with transfor performance.
+2. As mappings were added I was interested in knowing how the Rust compared to C with transform performance.
    This was too early in the process and driving the agent to make something faster led to it putting performance optimizations in the wrong places which then led to downstream confusion that built on those mistakes.
 
 The fundamental learning from the prototype work was that test coverage of the C library is critical, as is the use of the oracle to provide immediate feedback to compare with the new code when there is a disagreement.
@@ -248,7 +249,7 @@ This work provided the foundation for the next porting attempt.
 ## Starting Again From Scratch
 
 Once we had a better build and test story for the C library, by late April 2026 we decided to make another attempt at doing the port from scratch.
-By this time Claude Opus 4.6 was the current model and in addition to a $20/month team account I had access to a Claude API key through the DOE SLAC National Laboratory near Stanford.
+By this time Claude Opus 4.6 was the current model and in addition to a $20/month team account I had access to a Claude API key through the DOE SLAC National Accelerator Laboratory near Stanford.
 Since Rubin is partially funded by DOE we were allowed to make use of their new infrastructure based on Amazon Bedrock since SLAC was instructed to investigate ways in which LLMs can be used in research activities.
 For FY26 SLAC is absorbing the cost of the API keys as part of the research experiment so Rubin was able to make use of this without being charged.
 
@@ -262,8 +263,7 @@ This can give very nice results although subagents tend to use far more tokens t
 
 Work progressed reasonably well through August 2026 with the main impediment to progress being token starvation.
 It was possible to hit my monthly SLAC API key ceiling in the first week.
-The switch to Opus 5 also helped.
-It was noticeable how Fable (for some limited testing) and Opus 5 were able to come to solutions more quickly than the older models, so even though they were nominally more expensive per token the net cost per feature can be less.
+It was noticeable how Fable (for some limited testing) and Opus 5 (compared to Opus 4) were able to come to solutions more quickly than the older models, so even though they were nominally more expensive per token the net cost per feature can be less.
 
 ```{figure} starlink-astrs-loc.svg
 
@@ -305,7 +305,7 @@ The Rust test infrastructure does not include an "expected fail" state either th
 Many tokens were spent trying to generate the correct invert flags in the `FrameSet` serializations.
 These flags record the original state of the invert flag in the mapping since the invert state is owned by the `CmpMap` but because the C clones the mapping it needs to record that original state to make sure that the user's clone does not change.
 The Rust ownership model does not need to track this and since the design spec did not realize the significance of these flags in the C code it took many iterations and reverted experiments to get them to match up with the serialization.
-This is clearly a C implementation detail but has to be tracked for byte exactness and it took too long to understand its true meaning.
+This is clearly a C implementation detail but has to be tracked for byte-exactness and it took too long to understand its true meaning.
 
 ### Porting as Bug Finding
 
@@ -330,30 +330,32 @@ Most of them were very small fixes.
 - `astRate`'s zero-range confirmation read the range array at the loop counter instead of the stored index, confirming the wrong axis.
 - `PermMap::Equal` skipped comparing the referenced constants when both index entries matched, so `PermMap`s with different constant values compared equal.
 - `SpecFluxFrame`'s `astEqual` reported two identical frames as unequal.
-- negative grism interference orders were corrupted on read (−2 became −1, −1 became 0) due to negative floats rounding in the wrong direction.
-- the `(int)(x+0.5)` idiom rounds every negative value toward zero; fixed in `ConvertValue` and then swept tree-wide across 70 sites in 16 files, including the `WCSAXES` axis count.
+- Negative grism interference orders were corrupted on read (−2 became −1, −1 became 0) due to negative floats rounding in the wrong direction.
+- The `(int)(x+0.5)` idiom rounds every negative value toward zero; fixed in `ConvertValue` and then swept tree-wide across 70 sites in 16 files, including the `WCSAXES` axis count.
 - `astMapIterate` never terminated on a `KeyMap` with `SortBy` set: an infinite loop, latent because the only in-tree caller never sets it.
 - `astMapRename` on a locked `KeyMap` deleted the entry and then refused to re-add it, so the data was simply lost.
-- out-of-range and NaN double-to-integer conversion in `ConvertValue` was undefined behavior; now range-checked with a defined result.
-- numeric-string overflow into `%d` was UB, and glibc silently wrapped rather than failing; now detected.
-- a zero-length vector entry was dumped by reading an `Entry1X` as an `Entry0X`, writing pointer bytes as the value and null-dereferencing for one type; now rejected at `astMapPut1<X>`.
+- Out-of-range and NaN double-to-integer conversion in `ConvertValue` was undefined behavior; now range-checked with a defined result.
+- Numeric-string overflow into `%d` was UB, and glibc silently wrapped rather than failing; now detected.
+- A zero-length vector entry was dumped by reading an `Entry1X` as an `Entry0X`, writing pointer bytes as the value and null-dereferencing for one type; now rejected at `astMapPut1<X>`.
 - `astMapGetElem<X>` reported success on an undefined entry while writing nothing to the caller's buffer, unlike `astMapGet0<X>`/`astMapGet1<X>`.
 - `LoadKeyMap` injected a spurious `KyCas = 1` on every re-dump, because `KeyCase`'s unset sentinel is `-1`, not `-INT_MAX`.
 - `astLoadKeyMap` applied MpLck before loading any entry, so a locked non-empty `KeyMap` could never be read back at all.
 - `LoadKeyMap` read a `Mem%d` card that `DumpEntry` never writes, resetting the member counter so every loaded entry got member 0.
-- `astMapCopyEntry` normalized the key with the source `KeyMap`'s `KeyCase`, for both the destination lookup and the stored key.
-- `EncodeFloat` stripped a redundant exponent zero by shifting the prefix right rather than closing the gap, so any value wider than 20 columns (e.g. `FitsDigits=17`) was emitted one column right of every other card, running past column 30. Malformed FITS output.
-- legacy `CDjjjiii` cards were read (and so consumed) under every encoding but stored only under `FITS-IRAF`, silently losing the rotation matrix elsewhere.
+- `astMapCopyEntry` normalized the key with the source `KeyMap`'s `KeyCase`, for both the destination lookup and the stored key rather than using the key case of each independently.
+- `EncodeFloat` stripped a redundant exponent zero by shifting the prefix right rather than closing the gap, so any value wider than 20 columns (e.g. `FitsDigits=17`) was emitted one column right of every other card, running past column 30.
+  Malformed FITS output.
+- Legacy `CDjjjiii` cards were read (and so consumed) under every encoding but stored only under `FITS-IRAF`, silently losing the rotation matrix elsewhere.
 - `SpecTrans` marked only the first copy of a repeated keyword while `WcsFcRead` swept all of them, so reading a two-HDU header left a self-inconsistent partial WCS behind; `MJD-OBS` survival also depended on whether an unrelated `DATE-OBS` sat alongside it.
 
 There were also fixes that enforced stability in the native serialization format.
 Whilst the serialization format was historically meant to be treated as a private format understood solely by the C library, validating the Rust port requires that the output is predictable and can be reasoned about.
 
-- `WcsNative` built one `PermMap`, used it in two stages, and inverted it in between; because `astCmpMap` clones rather than copies, the stage-1 `CmpMap` serialized a vestigial `Invert = 1` on its child that the transform path ignores.
-- KeyMap dump ordering.
+- `WcsNative` built one `PermMap`, used it in two stages, and inverted it in between.
+  Since `astCmpMap` clones rather than copies, the stage-1 `CmpMap` serialized a vestigial `Invert = 1` on its child that the transform path ignores.
+- `KeyMap` dump ordering was unpredictable.
   `Dump` walked hash buckets and `LoadKeyMap` head-inserted on reload, so keys sharing a bucket swapped places on every dump/load cycle and a `KeyMap`'s serialization never converged.
   Now dumped in key order.
-- IsSimp tag placement.
+- `IsSimp` tag placement in dump depended on internal aliasing.
   A single `Mapping.flags` bit meant both "dump `IsSimp = 1`" and "do not simplify again", and `astSetInvert` cleared it as a side-effect, in particular as happens when `astEqual` is called.
   Which interior `CmpMap` node ended up carrying the tag therefore depended on shared-pointer aliasing history during simplification, with no structural rule a re-implementation could follow.
 
@@ -363,7 +365,7 @@ Fixes were also made as part of the enhancements to the test coverage, but those
 
 ```{figure} starlink-port-interleave.svg
 
-A timeline for the work described in this document as of mid August 2026.
+A timeline for the work described in this document as of mid-August 2026.
 You can see how the prototype triggered work in the C library to update the build system and add test coverage and that later work on the port resulted in separate work on the C library (bug fixes and additional test fixtures).
 The spike in the AST commit history in May is adding many more simplification example test fixtures.
 ```
@@ -371,7 +373,7 @@ The spike in the AST commit history in May is adding many more simplification ex
 The timeline for the port is shown in the figure above and demonstrates the different phases of the project and how the upstream test improvements and bug fixes interleaved with the core porting work.
 This timeline includes most of the mappings and all the frames and non-STC regions.
 It also includes `Channel` and `FitsChan` but none of the other channels (`YamlChan`, `XmlChan`, `Moc` and `MocChan`, `StcsChan`).
-It does not include `Plot`, `Plot3D`, or any `grf` backend, `Table` and `FitsTable`, `IntraMap`, `XphMap`.
+It does not include `Plot`, `Plot3D`, any `grf` backend, `Table` and `FitsTable`, `IntraMap`, or `XphMap`.
 Also missing is the core mapping functionality of `astResample`, `astRebin`, `astRebinSeq`, `astTranGrid` and `astQuadApprox`.
 These missing features account for about 30% of the code volume of the C library.
 There is no C or Python interface and there have been minimal performance optimizations -- the second port is currently slower than the prototype in many cases.
@@ -388,7 +390,7 @@ Porting a library of this size shows that the 80% is relatively straightforward 
 The key takeaway from this work is that your language port is only as good as the test coverage of your original code.
 The coding agent will try to take the easiest path to generating the code from your prompt.
 You can ask it to be faithful to the source language but you can't be sure it is really going to do that unless there are tests that demonstrate exactly what you need.
-For AST this is made more explicit by the addition of hundreds of test fixtures involving serialized FrameSets and Mappings as both native AST serializations and FITS headers.
+For AST this is made more explicit by the addition of hundreds of test fixtures involving serialized `FrameSet`s and `Mapping`s as both native AST serializations and FITS headers.
 Adding test coverage to the source library before you start the port, especially for edge cases, pays dividends many times over once you start on the port.
 You can use a coding agent to add the tests.
 
@@ -409,7 +411,7 @@ You can use a coding agent to add the tests.
   Use `pre-commit` / `prek` hooks to capture all code linting such as `ruff` and `numpydoc` in Python and `clippy` in Rust.
   Every gate you can apply to commits forces the agent to follow your guidelines in a far more robust way than making a note in the `CLAUDE.md` file ever would.
   In Python use as many `ruff check` options as you can.
-* Some coding practices do have to be included in the `CLAUDE.md` file but remember that this is guidance and not treated as a hard rule --- the prompt and history will all be processed along with the `CLAUDE.md`.
+* Some coding practices do have to be included in the `CLAUDE.md` file but remember that this is guidance and not treated as a hard rule; the prompt and history will all be processed along with the `CLAUDE.md`.
   Negative directives are weaker than positive directives.
   For Python, agents have a tendency to prefer to add imports locally rather than at the top of the file so consider adding an instruction to always put imports at the top unless there is an import cycle.
 * For the AST port it was critical to strongly declare that the C algorithms were the source of truth and were to always be used as is and to only use heuristics in the Rust if the same heuristic was present in the C.
@@ -418,7 +420,7 @@ You can use a coding agent to add the tests.
   Sometimes the agent will not tell you about them (such as triggering a SEGV in an oracle investigation) so you have to ask.
   Sometimes the agent will realize there is a bug in the original but code that bug into the port.
   I eventually added a standard instruction noting that bugs are possible in the original and should be recorded in a separate document.
-* Some times the agent will flail around trying to work out what is going wrong.
+* Sometimes the agent will flail around trying to work out what is going wrong.
   Remember that you have an oracle.
   Suggest to the agent that it instruments the original library so it can trace exactly what code is involved for a passing test.
   This helped many times in the port of the AST library for mapping simplification verification and for performance validation such as ensuring the same number of trigonometric calls occur in both the original and the port.
@@ -431,15 +433,9 @@ When porting from one language to another you have to decide whether "byte exact
 The former is much harder than the latter but is required if this is a mission critical core library.
 Once you are byte exact, you are then able to focus on performance optimizations.
 
-[^astshim]: <https://github.com/lsst/astshim>
-[^rubinoxide]: <https://github.com/lsst/rubinoxide>
-[^jniast]: The JNIAST package in 2002 October included the lines "This package is a temporary measure; in due course it will be superseded by the pure java WCS package.  WCS is being actively worked on now (mid 2002), but the timescale for completion is uncertain."
-[^treeview]: The [treeview docs](https://github.com/Starlink/starjava/blob/master/treeview/src/resources/uk/ac/starlink/treeview/docs/homepage.html#L313C5-L313C37) still refer to a todo item of "Pure java version of WCS support" as of August 2026.
-[^longterm]: Ironically, the same argument for porting to Rust using coding agents could apply to using those same agents to update the existing C library --- by default the agents will match the coding style of the surrounding code and they are not scared by non-standard inheritance models or clever memory management.
-
 ## Conclusions
 
-At the time of writing it is clear that a Large Language Model coding agent such as Claude Opus/Fable or ChatGPT 5.6 Sol, is fully capable of porting large libraries to different languages so long as the original library is well tested.
+At the time of writing it is clear that a Large Language Model coding agent such as Claude Opus/Fable or ChatGPT 5.6 Sol is fully capable of porting large libraries to different languages so long as the original library is well tested.
 The test suite, planning, and a reference oracle mitigate many of the problems encountered when using LLMs to write large amounts of new code that has no such boundary conditions.
 At Rubin the observatory software team is experimenting with using agents to convert LabVIEW to Rust.
 The LSST Science Pipelines have 150,000 lines of C++ code in libraries and it is now clear that converting that to Rust is a plausible enterprise if we wish to do so.
@@ -457,6 +453,12 @@ The project would not have been possible without the generous allocations of tok
 ```{bibliography}
   :style: lsst_aa
 ```
+
+[^astshim]: <https://github.com/lsst/astshim>
+[^rubinoxide]: <https://github.com/lsst/rubinoxide>
+[^jniast]: The JNIAST package in 2002 October included the lines "This package is a temporary measure; in due course it will be superseded by the pure java WCS package.  WCS is being actively worked on now (mid 2002), but the timescale for completion is uncertain."
+[^treeview]: The [treeview docs](https://github.com/Starlink/starjava/blob/master/treeview/src/resources/uk/ac/starlink/treeview/docs/homepage.html#L313C5-L313C37) still refer to a todo item of "Pure java version of WCS support" as of August 2026.
+[^longterm]: Ironically, the same argument for porting to Rust using coding agents could apply to using those same agents to update the existing C library. By default the agents will match the coding style of the surrounding code and they are not scared by non-standard inheritance models or clever memory management.
 
 ## Appendix: Initial Port Design Spec
 
