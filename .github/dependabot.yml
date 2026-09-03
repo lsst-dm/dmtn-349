@@ -4,9 +4,15 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      weekly-batch:
+        - "*"
 
   - package-ecosystem: "pip"
     directory: "/"
     versioning-strategy: "increase-if-necessary"
     schedule:
       interval: "weekly"
+    groups:
+      weekly-batch:
+        - "*"
