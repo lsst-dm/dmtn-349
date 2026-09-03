@@ -10,16 +10,16 @@ The main outcome from this work is that your success in porting any code to a di
 
 ## Introduction
 
-In February 2026 I was modernizing the Python bindings of the Starlink AST library {cite:p}`2016A&C....15...33B` to make it usable as the WCS backend for our file format and data modeling rewrite of the LSST Science Pipelines images {cite:p}`DMTN-339`.
-This was needed since there had been a new release of the C library that included critical functionality and we needed those changes [on PyPI](https://pypi.org/project/starlink-pyast/).
+In February 2026 I was modernizing the Python bindings of the Starlink AST library {cite:p}`2016A&C....15...33B` to make it usable as the WCS backend for the file format and data modeling rewrite of the LSST Science Pipelines images {cite:p}`DMTN-339`.
+This was needed since there had been a new release of the C library that included critical functionality and Rubin needed those changes [on PyPI](https://pypi.org/project/starlink-pyast/).
 For historical reasons (the Python wrapping work started in 2011) the Python interface was written using native C Python APIs and had to support Python 2.6 and 3.x.
 I decided to try using the newly-released OpenAI Codex with GPT-5.3 and I was impressed by its ability to quickly analyze the code, remove the Python 2 legacy interfaces and modernize the C API calls for Python 3.11 and newer.
 Since I had long wondered whether the wrapper should be using Cython instead of native APIs, I asked Codex to make a proof of concept demonstration of a Cython wrapper and it did exactly that.
 For context the hand-crafted C wrapper consisted of about 13,000 lines of code, so a full conversion was not a trivial undertaking but the demonstration did hint at future possibilities.
-This proof of concept led to a discussion of the broader implications and we wondered if we could now port the AST C library to Rust.
+This proof of concept led to a discussion of the broader implications and I wondered if I could now port the AST C library to Rust.
 
-The long-term support of the C library has been a concern in the project ever since we adopted the library for WCS in 2016 {cite:p}`DMTN-010`.
-In particular the object-oriented C style and steep learning curve, associated with the library having a single developer, caused concern about the long-term support of the library[^longterm] and some people at Rubin had been wondering whether it would be better for the next decade if we had a Rust library implementing the core AST algorithms that we needed.
+The long-term support of the C library has been a concern in the project ever since Rubin adopted the library for WCS in 2016 {cite:p}`DMTN-010`.
+In particular the object-oriented C style and steep learning curve, associated with the library having a single developer, caused concern about the long-term support of the library[^longterm] and some people at Rubin had been wondering whether it would be better for the next decade if there were a Rust library implementing the core AST algorithms that the project needed.
 
 People have been wondering if large language models can aid with language ports for a while {cite:p}`10.48550/arXiv.2511.20617,10.1145/3729379` but the state of the art in this field is moving so fast that techniques and failures from 2025 using models like ChatGPT 4 are fully out of date.
 In {cite:t}`10.48550/arXiv.2511.20617` they built a specialist infrastructure specifically for using LLMs to convert from C to Rust but the largest code base they tackled was of order 15,000 lines of code.
@@ -44,7 +44,7 @@ Additionally, to improve performance when rapidly creating and freeing many obje
 The core of the C library (not including tests or vendored code) consists of nearly 475,000 lines.
 This is a substantial library to port to any language.
 There are three vendored C libraries handling the spherical geometry and time transformations: WCSLIB {cite:p}`2011ascl.soft08003C`, ERFA (the BSD-licensed version of SOFA), and PAL {cite:p}`2013ASPC..475..307J`.
-For this work we decided to retain those vendored libraries (around 65k lines of C) in the Rust port, with the eventual plan to port the subset needed for AST to Rust when we were convinced that the port was stable and accurate.
+For this work I decided to retain those vendored libraries (around 65k lines of C) in the Rust port, with the eventual plan to port the subset needed for AST to Rust when I was convinced that the port was stable and accurate.
 
 ```{figure} starlink-ast-loc.svg
 
@@ -79,8 +79,8 @@ This approach was also adopted by the `lsst-images` package {cite:p}`DMTN-339` w
 
 ## Porting to Rust
 
-As the C++ standard has become more and more complex, resulting in books actively telling you all the ways you can make mistakes {cite:p}`lakos2021embracing,yonts2025mistakes,meyers2014effective`, we increasingly sought alternatives.
-At the Vera C. Rubin Observatory we have been considering the use of Rust {cite:p}`klabnik2026rust` for some time, with [RFC-1069](https://rubinobs.atlassian.net/browse/RFC-1069) in early 2025 approving its usage in the LSST Science Pipelines.
+As the C++ standard has become more and more complex, resulting in books actively telling you all the ways you can make mistakes {cite:p}`lakos2021embracing,yonts2025mistakes,meyers2014effective`, Rubin increasingly sought alternatives.
+Rubin Observatory has been considering the use of Rust {cite:p}`klabnik2026rust` for some time, with [RFC-1069](https://rubinobs.atlassian.net/browse/RFC-1069) in early 2025 approving its usage in the LSST Science Pipelines.
 The first Rust code was added to the LSST Science Pipelines {cite:p}`PSTN-019` in early 2026.[^rubinoxide]
 
 There are numerous reasons to consider porting the C AST library to Rust.
@@ -91,7 +91,7 @@ There are numerous reasons to consider porting the C AST library to Rust.
 3. Rust has a much stronger type system than C, enforced by the compiler, and has explicit approaches for indicating optional return values and error states that can be reasoned about by the compiler and are much easier to track than the AST global status.
 
 Additionally, once a decision has been made to port to Rust there are well-supported ways for providing a backwards compatible C interface as well as the possibility of having a clean independent Python wrapper directly on the Rust.
-These reasons were enough to suggest that we should try to port the AST library, even though it is clearly a very challenging library to pick as a first test of using agents to do a port.
+These reasons were enough to suggest that I should try to port the AST library, even though it is clearly a very challenging library to pick as a first test of using agents to do a port.
 
 ## The First Prototype
 
@@ -158,11 +158,11 @@ In about 10 days the port implemented about 15% of the C library's logic, domina
 Writing of FITS headers was not implemented but native plain text serialization was added for the supported subset of mappings.
 
 The work did demonstrate one of the key motivations for the investigation.
-We have long known that AST is extremely inefficient at transforming small numbers of points.
+It has long been known that AST is extremely inefficient at transforming small numbers of points.
 This is because there are setup costs in the C before a transformation can trigger but those are not necessary in Rust.
 For the representative Rubin `FrameSet` a single point transform is 3- to 8x faster than the C.
 For large numbers of points in some cases with the `PolyMap` transformation the Rust is 1.2x faster going forward and 1.5x faster for the inverse direction, without using vectorization.
-Clearly some of these optimizations for the large scale `PolyMap` improvements could also be applied to the C, but it did provide solid evidence that we would not lose performance in adopting Rust.
+Clearly some of these optimizations for the large scale `PolyMap` improvements could also be applied to the C, but it did provide solid evidence that adopting Rust would not lose performance.
 One key insight from this is that the ability to run tests and benchmarks directly against the C "oracle" is invaluable.
 Codex built a full oracle test and benchmarking harness and was able to iterate rapidly on the profiling because of this.
 Additionally it instrumented the C and Rust code to report exactly which trigonometry calculations were being triggered and could therefore prove that the C and Rust were doing the same number of calculations when they got the same answer, instead of the Rust getting the answer because of a heuristic.
@@ -226,38 +226,38 @@ By April 2026 it was realized that there was some fundamental work that could be
 The first task was to simplify the build system.
 The AST C library uses the GNU Autoconf tooling but with Starlink extensions for handling some of the Fortran interfaces {cite:p}`2005ASPC..347..119G`.
 The core library is not in itself complicated to build, but the Git source has no means to build it automatically without having access to the Starlink software distribution.
-For the prototype we got around this by teaching Codex how to build the oracle based on it working out how the Python bindings were built.
-This was not the most efficient approach and so in April 2026 we used Claude Opus 4.6 to build an entire parallel CMake build system that would build the C library (not the Fortran bindings) and run the C tests.
-We also methodically converted the Fortran tests to C and added coverage reporting into CI so we could determine the current state of the test suite.
+For the prototype I got around this by teaching Codex how to build the oracle based on it working out how the Python bindings were built.
+This was not the most efficient approach and so in April 2026 I used Claude Opus 4.6 to build an entire parallel CMake build system that would build the C library (not the Fortran bindings) and run the C tests.
+I also methodically converted the Fortran tests to C and added coverage reporting into CI so I could determine the current state of the test suite.
 For one of these Fortran test files (about 1300 lines of Fortran) I had run out of Claude tokens and switched to Gemini Pro 3.1 -- it took a couple of hours and didn't make much progress.
 When I had access to Claude it looked at the code, determined that the code was a very naive direct Fortran-to-C port, and decided it was easier to rewrite it from scratch, which it did in ten minutes.
 Additionally, Gemini had read the instruction that there should be no new warnings introduced so it decided to use `#pragma` to turn off the warnings in its new code.
 
-This work was focused on determining the current code coverage as a whole and not specifically the parts that we wanted to focus on for the initial port, and so included coverage for the plotting subsystem.
-Since the Fortran plotting tests required PGPLOT we added a new graphics backend for PLplot and additionally Claude wrote a native SVG plotting backend which was very useful since Claude can read SVG outputs natively and reason about their contents, allowing it to iterate rapidly to ensure that the SVG was rendering correctly.
+This work was focused on determining the current code coverage as a whole and not specifically the parts that I wanted to focus on for the initial port, and so included coverage for the plotting subsystem.
+Since the Fortran plotting tests required PGPLOT I added a new graphics backend for PLplot and additionally Claude wrote a native SVG plotting backend which was very useful since Claude can read SVG outputs natively and reason about their contents, allowing it to iterate rapidly to ensure that the SVG was rendering correctly.
 When this code was merged the code coverage for the core library code was approximately 50%.
-Adding GitHub Actions CI also enabled us to easily do sanitizer builds, which immediately found a couple of latent buffer overruns that had been around for a long time.
+Adding GitHub Actions CI also enabled me to easily do sanitizer builds, which immediately found a couple of latent buffer overruns that had been around for a long time.
 
 Once that was in place the next step was to create more example FITS headers.
 For this work Claude was tasked with improving the coverage solely of the FITS handling file.
 It was able to read the code and then attempt to create a FITS header targeting a specific line.
-The FITS header handling is one of the most esoteric parts of the AST source since it encodes many historical variants of FITS headers, many of which are not in wide circulation today, but it was felt that a port that could only read current FITS WCS variants would not be a real port, and we could not abandon the historical support (the AST library is used by the SAOImageDS9 image viewer specifically for this reason).
+The FITS header handling is one of the most esoteric parts of the AST source since it encodes many historical variants of FITS headers, many of which are not in wide circulation today, but it was felt that a port that could only read current FITS WCS variants would not be a real port, and I could not abandon the historical support (the AST library is used by the SAOImageDS9 image viewer specifically for this reason).
 This work added 90 new FITS headers to the test fixtures, with the code coverage for the FITS handler increasing to 75% -- the remaining coverage was difficult to establish since much of it involves correctness tests that are acting as safety nets confirming a situation that is already handled earlier in the chain.
 
 This work provided the foundation for the next porting attempt.
 
 ## Starting Again From Scratch
 
-Once we had a better build and test story for the C library, by late April 2026 we decided to make another attempt at doing the port from scratch.
+Once I had a better build and test story for the C library, by late April 2026 I decided to make another attempt at doing the port from scratch.
 By this time Claude Opus 4.6 was the current model and in addition to a $20/month team account I had access to a Claude API key through the DOE SLAC National Accelerator Laboratory near Stanford.
-Since Rubin is partially funded by DOE we were allowed to make use of their new infrastructure based on Amazon Bedrock since SLAC was instructed to investigate ways in which LLMs can be used in research activities.
+Since Rubin is partially funded by DOE I was allowed to make use of their new infrastructure based on Amazon Bedrock since SLAC was instructed to investigate ways in which LLMs can be used in research activities.
 For FY26 SLAC is absorbing the cost of the API keys as part of the research experiment so Rubin was able to make use of this without being charged.
 
-This time we decided to start by planning what we thought the port should look like in terms of memory management and mutability and how traits should relate to C methods.
+This time I decided to start by planning what I thought the port should look like in terms of memory management and mutability and how traits should relate to C methods.
 As was done previously the wcsLib, ERFA, and PAL source code was copied unchanged with Rust shims on top.
 
 Work started on 2026-04-27 with Claude Opus 4.6.
-For planning we used the [Superpowers](https://github.com/obra/superpowers) plugin, and this was particularly helpful in iterative specification development and then building and documenting implementation plans.
+For planning I used the [Superpowers](https://github.com/obra/superpowers) plugin, and this was particularly helpful in iterative specification development and then building and documenting implementation plans.
 It defines a full software development process involving using subagents (usually of a lesser model) to implement the plan, and then review of that work by the main agent.
 This can give very nice results although subagents tend to use far more tokens than using the main model, even if a lesser model is doing the work.
 
@@ -272,8 +272,8 @@ Lines of code as a function of time for the second Rust port.
 
 ### Lessons Learned
 
-In the prototype we attempted to build a C ABI incrementally in order to ensure that C semantics could work.
-On the second attempt we deliberately punted the C ABI until the very last stage once full functionality was ported.
+In the prototype I attempted to build a C ABI incrementally in order to ensure that C semantics could work.
+On the second attempt I deliberately punted the C ABI until the very last stage once full functionality was ported.
 At this time it is unclear whether this was the right approach since it is much harder to change direction after a full implementation.
 A simple demonstration of a `FrameSet` and a `ZoomMap` transforming a number from the C side would give more confidence in the approach specified in the spec but nothing has yet been tried.
 Even more importantly, the ownership model in Rust where adding a mapping to a `CmpMap` transfers ownership to the `CmpMap` is not how the C behaves where adding a mapping to a `CmpMap` clones the mapping -- once inside the `CmpMap` the mapping is marked as immutable so there is no change in core behavior, but there is a change at the edges where in C if you try to change the state of a mapping after it has been added to a `CmpMap` you get an error but if the Rust port has done a deep copy your modification would look like it is working but would have no effect on the `CmpMap`.
@@ -289,8 +289,8 @@ Fixing that took a while to recover with many commits porting C algorithms and r
 Even by late August with 400 test fixtures passing it was discovered that some parts of the simplification chain were in the wrong place and other places were missing with workarounds.
 This was discovered with a full audit comparing the C and Rust side.
 It was even discovered that some bespoke logic had been included in the serialization layer to allow a test to pass even though the simplification logic was not fully accurate.
-Given that the transform logic was working correctly and the serialization output was incorrect in an edge case, we still needed to match the C logic to give us confidence we had not missed something critical.
-Even worse, whilst trying to recover from the earlier mistakes and instrumenting the entire simplification engine we realized that very early on the port had written a `simplified()` API that corresponded to the internal vtable implementation but which incorrectly included some `map_merge` logic when it should not and crucially was called in much of the code instead of the public `simplify()` method.
+Given that the transform logic was working correctly and the serialization output was incorrect in an edge case, I still needed to match the C logic to give me confidence I had not missed something critical.
+Even worse, whilst trying to recover from the earlier mistakes and instrumenting the entire simplification engine I realized that very early on the port had written a `simplified()` API that corresponded to the internal vtable implementation but which incorrectly included some `map_merge` logic when it should not and crucially was called in much of the code instead of the public `simplify()` method.
 This was the root cause of the simplification discrepancies since only `simplify()` stamped the `IsSimple` flag and calling the internal method bypassed that flag and led to premature simplifications or redone simplifications.
 Furthermore, having some logic in `simplified()` instead of `map_merge` meant that the `CmpMap` simplification could not be reproduced.
 Recovering this dominated the late August work.
@@ -300,7 +300,7 @@ Since nothing was tracking the missing logic there were cases in other parts of 
 
 Early on there were hundreds of test fixtures failing and so those tests were made optional.
 This was fine except it was easy to forget that they were failing when all tests were green.
-The Rust test infrastructure does not include an "expected fail" state either that could let us know if a fix elsewhere led to a test passing that was not expected.
+The Rust test infrastructure does not include an "expected fail" state either that could let me know if a fix elsewhere led to a test passing that was not expected.
 
 Many tokens were spent trying to generate the correct invert flags in the `FrameSet` serializations.
 These flags record the original state of the invert flag in the mapping since the invert state is owned by the `CmpMap` but because the C clones the mapping it needs to record that original state to make sure that the user's clone does not change.
@@ -310,7 +310,7 @@ This is clearly a C implementation detail but has to be tracked for byte-exactne
 ### Porting as Bug Finding
 
 During the porting work there were times when the agent would be unable to reproduce a fixture or a test and determine that there was a possible bug in the upstream C library itself.
-As of August 2026 we found numerous bugs and fixed them.
+As of August 2026 I had found numerous bugs and fixed them.
 Some of them required updating of reference fixtures and so there was a virtuous cycle of finding a bug, reporting a bug, fixing a bug, merging the upstream fix, and syncing upstream with the port.
 
 The port discovered and led to fixes of the following bugs.
@@ -404,7 +404,7 @@ You can use a coding agent to add the tests.
   Even if you have code coverage for the small area you are optimizing you make it harder later on to reason about whether the Rust version truly matches the C approach and sometimes the optimization can shift logic around that confuses a later code addition that relied on the earlier form.
 * You do not want to end up with a line for line port of the source library to the new language.
   You want to ensure that the algorithms are ported (with annotations) whilst making use of new language features.
-  For example, for the Rust port we used the standard `Option` and `Result` approach to status handling rather than inherited integer status.
+  For example, for the Rust port I used the standard `Option` and `Result` approach to status handling rather than inherited integer status.
   The AST library is particularly well-suited to porting since the original authors were very careful to explain all their decisions as detailed comments and to carefully separate each chunk of logic (there are more comment lines than code lines).
   This allowed the Rust port to easily point at distinct blocks of code in the original.
 * Ensure that your coding standards cannot be bypassed.
@@ -438,7 +438,7 @@ Once you are byte exact, you are then able to focus on performance optimizations
 At the time of writing it is clear that a Large Language Model coding agent such as Claude Opus/Fable or ChatGPT 5.6 Sol is fully capable of porting large libraries to different languages so long as the original library is well tested.
 The test suite, planning, and a reference oracle mitigate many of the problems encountered when using LLMs to write large amounts of new code that has no such boundary conditions.
 At Rubin the observatory software team is experimenting with using agents to convert LabVIEW to Rust.
-The LSST Science Pipelines have 150,000 lines of C++ code in libraries and it is now clear that converting that to Rust is a plausible enterprise if we wish to do so.
+The LSST Science Pipelines have 150,000 lines of C++ code in libraries and it is now clear that converting that to Rust is a plausible enterprise if the project wishes to do so.
 Most of those pipelines libraries are significantly less complex than the AST library.
 
 ## Acknowledgments
