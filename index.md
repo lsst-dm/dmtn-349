@@ -8,9 +8,11 @@ The motivation for choosing Rust is the much stronger memory management model an
 The main outcome from this work is that your success in porting any code to a different language using agents depends entirely on the test coverage of your original source code.
 ```
 
+DOI: [10.71929/rubin/17426051](https://doi.org/10.71929/rubin/17426051)
+
 ## Introduction
 
-In February 2026 I was modernizing the Python bindings of the Starlink AST library {cite:p}`2016A&C....15...33B` to make it usable as the WCS backend for the file format and data modeling rewrite of the LSST Science Pipelines images {cite:p}`DMTN-339`.
+In February 2026 I was modernizing the Python bindings of the Starlink AST library {cite:p}`2016A&C....15...33B` to make it usable as the WCS backend for the file format and data modeling rewrite of the LSST Science Pipelines images {cite:p}`DMTN-339,2026SPIE14155E..17B`.
 This was needed since there had been a new release of the C library that included critical functionality and Rubin needed those changes [on PyPI](https://pypi.org/project/starlink-pyast/).
 For historical reasons (the Python wrapping work started in 2011) the Python interface was written using native C Python APIs and had to support Python 2.6 and 3.x.
 I decided to try using the newly-released OpenAI Codex with GPT-5.3 and I was impressed by its ability to quickly analyze the code, remove the Python 2 legacy interfaces and modernize the C API calls for Python 3.11 and newer.
@@ -264,10 +266,13 @@ This can give very nice results although subagents tend to use far more tokens t
 Work progressed reasonably well through August 2026 with the main impediment to progress being token starvation.
 It was possible to hit my monthly SLAC API key ceiling in the first week.
 It was noticeable how Fable (for some limited testing) and Opus 5 (compared to Opus 4) were able to come to solutions more quickly than the older models, so even though they were nominally more expensive per token the net cost per feature can be less.
+In October I switched to a Claude Pro account and was able to make much larger progress for much less money.
+It seems like the Pro accounts are more generous with token allocations and it helps that even if you hit your cap (one time I did get above 90% of weekly allocation) it resets each week.
 
 ```{figure} starlink-astrs-loc.svg
 
 Lines of code as a function of time for the second Rust port.
+The rapid increase in October 2026 was driven by a switch from using a cost-capped API key to a Claude Pro account.
 ```
 
 ### Lessons Learned
@@ -310,10 +315,11 @@ This is clearly a C implementation detail but has to be tracked for byte-exactne
 ### Porting as Bug Finding
 
 During the porting work there were times when the agent would be unable to reproduce a fixture or a test and determine that there was a possible bug in the upstream C library itself.
-As of August 2026 I had found numerous bugs and fixed them.
+As of October 2026 I had found numerous bugs and fixed them.
 Some of them required updating of reference fixtures and so there was a virtuous cycle of finding a bug, reporting a bug, fixing a bug, merging the upstream fix, and syncing upstream with the port.
 
-The port discovered and led to fixes of the following bugs.
+The port discovered and led to fixes of approximately 100 bugs.
+A representative sample are below.
 I include them here to give an idea of the different types of issues encountered.
 Most of them were very small fixes.
 
@@ -349,6 +355,7 @@ Most of them were very small fixes.
 
 There were also fixes that enforced stability in the native serialization format.
 Whilst the serialization format was historically meant to be treated as a private format understood solely by the C library, validating the Rust port requires that the output is predictable and can be reasoned about.
+One bug that could not be fixed was the writing of the incorrect serialization type for MOCs; the native output says "string" for "json" and vice versa and no-one noticed because on read the mapping is also incorrect -- fixing it would break existing serialized output and AST serializations do not include version schema information.
 
 - `WcsNative` built one `PermMap`, used it in two stages, and inverted it in between.
   Since `astCmpMap` clones rather than copies, the stage-1 `CmpMap` serialized a vestigial `Invert = 1` on its child that the transform path ignores.
@@ -365,17 +372,16 @@ Fixes were also made as part of the enhancements to the test coverage, but those
 
 ```{figure} starlink-port-interleave.svg
 
-A timeline for the work described in this document as of mid-August 2026.
+A timeline for the work described in this document as of October 2026.
 You can see how the prototype triggered work in the C library to update the build system and add test coverage and that later work on the port resulted in separate work on the C library (bug fixes and additional test fixtures).
 The spike in the AST commit history in May is adding many more simplification example test fixtures.
 ```
 
 The timeline for the port is shown in the figure above and demonstrates the different phases of the project and how the upstream test improvements and bug fixes interleaved with the core porting work.
-This timeline includes most of the mappings and all the frames and non-STC regions.
-It also includes `Channel` and `FitsChan` but none of the other channels (`YamlChan`, `XmlChan`, `Moc` and `MocChan`, `StcsChan`).
-It does not include `Plot`, `Plot3D`, any `grf` backend, `Table` and `FitsTable`, `IntraMap`, or `XphMap`.
-Also missing is the core mapping functionality of `astResample`, `astRebin`, `astRebinSeq`, `astTranGrid` and `astQuadApprox`.
-These missing features account for about 30% of the code volume of the C library.
+This timeline includes all the mappings, frames, and regions.
+It also includes `Channel`, `FitsChan`, `Moc` and `MocChan` but none of the other channels (`YamlChan`, `XmlChan`, `StcsChan`).
+It does not include `Plot`, `Plot3D`, or any `grf` backend.
+These missing features account for about 20% of the code volume of the C library.
 There is no C or Python interface and there have been minimal performance optimizations -- the second port is currently slower than the prototype in many cases.
 
 From a distance it looks to the naive user that stacking some transforms together should be relatively straightforward.
@@ -441,12 +447,19 @@ At Rubin the observatory software team is experimenting with using agents to con
 The LSST Science Pipelines have 150,000 lines of C++ code in libraries and it is now clear that converting that to Rust is a plausible enterprise if the project wishes to do so.
 Most of those pipelines libraries are significantly less complex than the AST library.
 
+It is also striking how in the current, late 2026, of charging models, an API key is significantly more costly per token than a Pro or Max account.
+Team accounts have 5-hour and weekly allocations but they do at least reset each week and you understand the cost.
+In my experience it is more cost effective to pay for a Max or Pro account than to pay for API key usage.
+I was able to do as much work on a Pro account ($100 equivalent) in October as I was able to do in September with a far higher spend cap on API key.
+
 ## Acknowledgments
 
 I thank David Berry and Jim Bosch for their feedback on the initial design spec and for answering numerous questions.
-In particular David also was tasked with reviewing some of the giant AST pull requests.
+In particular David also was tasked with reviewing some of the giant AST pull requests with bug fixes resulting from this work.
 I also thank Michael Shehadeh from SLAC IT for his help with the Claude configuration and API key at SLAC.
 The project would not have been possible without the generous allocations of tokens from SLAC IT.
+Finally, I thank Cristián Silva from Rubin for giving me access to a Claude Pro account in September, that allowed the final push to be completed.
+
 
 ## References
 
