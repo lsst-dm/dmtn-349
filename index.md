@@ -12,7 +12,7 @@ DOI: [10.71929/rubin/17426051](https://doi.org/10.71929/rubin/17426051)
 
 ## Introduction
 
-In February 2026 I was modernizing the Python bindings of the Starlink AST library {cite:p}`2016A&C....15...33B` to make it usable as the WCS backend for the file format and data modeling rewrite of the LSST Science Pipelines images {cite:p}`DMTN-339`.
+In February 2026 I was modernizing the Python bindings of the Starlink AST library {cite:p}`2016A&C....15...33B` to make it usable as the WCS backend for the file format and data modeling rewrite of the LSST Science Pipelines images {cite:p}`DMTN-339,2026SPIE14155E..17B`.
 This was needed since there had been a new release of the C library that included critical functionality and Rubin needed those changes [on PyPI](https://pypi.org/project/starlink-pyast/).
 For historical reasons (the Python wrapping work started in 2011) the Python interface was written using native C Python APIs and had to support Python 2.6 and 3.x.
 I decided to try using the newly-released OpenAI Codex with GPT-5.3 and I was impressed by its ability to quickly analyze the code, remove the Python 2 legacy interfaces and modernize the C API calls for Python 3.11 and newer.
