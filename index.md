@@ -8,6 +8,8 @@ The motivation for choosing Rust is the much stronger memory management model an
 The main outcome from this work is that your success in porting any code to a different language using agents depends entirely on the test coverage of your original source code.
 ```
 
+DOI: [10.71929/rubin/17426051](https://doi.org/10.71929/rubin/17426051)
+
 ## Introduction
 
 In February 2026 I was modernizing the Python bindings of the Starlink AST library {cite:p}`2016A&C....15...33B` to make it usable as the WCS backend for the file format and data modeling rewrite of the LSST Science Pipelines images {cite:p}`DMTN-339`.
